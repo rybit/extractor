@@ -20,8 +20,7 @@
   },
   "fields": [ {
       "position": 0,
-      "label": "timestamp",
-      "type": "number"
+      "type": "timestamp"
     }, {
       "position": 1,
       "type": "number"
@@ -35,6 +34,10 @@
       "type": "number"
     }, {
       "position": 6
+    }, {
+      "position": 7,
+      "type": "url",
+      "label": "domain"
     }, {
       "position": 8
     }

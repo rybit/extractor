@@ -9,7 +9,7 @@ import:
 - package: github.com/rybit/nats_logrus_hook
   version: v1.0.2
 - package: github.com/rybit/nats_metrics
-  version: v1.1.1
+  version: v1.1.2
 - package: github.com/spf13/cobra
 - package: github.com/spf13/viper
 testImport:

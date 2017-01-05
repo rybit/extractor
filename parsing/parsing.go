@@ -1,9 +1,13 @@
 package parsing
 
 import (
+	"net/url"
+	"strconv"
 	"strings"
 
-	"strconv"
+	"fmt"
+
+	"time"
 
 	"github.com/Sirupsen/logrus"
 )
@@ -11,10 +15,12 @@ import (
 type FieldType string
 
 const (
-	StringType FieldType = "string"
-	NumberType FieldType = "number"
-	FloatType  FieldType = "float"
-	BoolType   FieldType = "bool"
+	StringType    FieldType = "string"
+	NumberType    FieldType = "number"
+	FloatType     FieldType = "float"
+	BoolType      FieldType = "bool"
+	URLType       FieldType = "url"
+	TimestampType FieldType = "timestamp"
 )
 
 type FieldDef struct {
@@ -67,7 +73,8 @@ func ExtractDefinition(raw, delim string, log *logrus.Entry) *FieldDef {
 	return def
 }
 
-func ParseLine(raw string, fields []FieldDef, log *logrus.Entry) (map[string]interface{}, bool) {
+func ParseLine(raw string, fields []FieldDef, log *logrus.Entry) (time.Time, map[string]interface{}, bool) {
+	timestamp := time.Time{}
 	dims := make(map[string]interface{})
 	parts := strings.Split(raw, " ")
 
@@ -75,7 +82,7 @@ func ParseLine(raw string, fields []FieldDef, log *logrus.Entry) (map[string]int
 		if def.Position > len(parts) {
 			if def.Required {
 				log.Warnf("Missing required field at position %d, there are only %d entries", def.Position, len(parts))
-				return nil, false
+				return timestamp, nil, false
 			}
 			// we don't care about this field
 			continue
@@ -91,7 +98,7 @@ func ParseLine(raw string, fields []FieldDef, log *logrus.Entry) (map[string]int
 		if len(rawParts) != 2 {
 			log.Warnf("Failed to split the field '%s' using delimiter '%s'", part, def.Delimiter)
 			if def.Required {
-				return nil, false
+				return timestamp, nil, false
 			}
 			continue
 		}
@@ -110,6 +117,17 @@ func ParseLine(raw string, fields []FieldDef, log *logrus.Entry) (map[string]int
 			val, err = strconv.ParseBool(rawVal)
 		case StringType, FieldType(""):
 			val = rawVal
+		case URLType:
+			val, err = extractDomain(rawVal)
+		case TimestampType:
+			timestamp, err = extractTime(rawVal)
+			if err != nil {
+				log.WithError(err).Warnf("Failed to convert '%s' to a %s", rawVal, def.Type)
+				if def.Required {
+					return timestamp, nil, false
+				}
+			}
+			continue
 		default:
 			val = rawVal
 			log.Warnf("Unknown field type '%s' treating it as a string", def.Type)
@@ -118,7 +136,7 @@ func ParseLine(raw string, fields []FieldDef, log *logrus.Entry) (map[string]int
 		if err != nil {
 			log.WithError(err).Warnf("Failed to convert '%s' to a %s", rawVal, def.Type)
 			if def.Required {
-				return nil, false
+				return timestamp, nil, false
 			}
 		} else {
 			if def.Label != "" {
@@ -129,5 +147,35 @@ func ParseLine(raw string, fields []FieldDef, log *logrus.Entry) (map[string]int
 		}
 	}
 
-	return dims, true
+	return timestamp, dims, true
+}
+
+func extractDomain(rawURL string) (string, error) {
+	url, err := url.Parse(rawURL)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%s://%s", url.Scheme, url.Host), nil
+}
+
+func extractTime(rawVal string) (time.Time, error) {
+	// could be a number
+	if num, err := strconv.Atoi(rawVal); err == nil {
+		return time.Unix(int64(num), 0), nil
+	}
+
+	// try a few formats
+	formats := []string{
+		time.RFC822Z, time.RFC822, time.RFC1123Z, time.RFC1123,
+		time.RFC3339Nano, time.RFC3339, time.RFC850,
+		time.ANSIC, time.RubyDate, time.UnixDate,
+	}
+	for _, layout := range formats {
+		if ts, err := time.Parse(layout, rawVal); err == nil {
+			return ts, nil
+		}
+	}
+
+	return time.Time{}, fmt.Errorf("Failed to parse timestamp from '%s'", rawVal)
 }

@@ -3,6 +3,8 @@ package parsing
 import (
 	"testing"
 
+	"time"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
@@ -57,7 +59,7 @@ func TestParseLineNiceLine(t *testing.T) {
 		},
 	}
 	raw := "nothing=else enter=sandman marp:123"
-	if res, ok := ParseLine(raw, fields, tl); assert.True(t, ok) {
+	if _, res, ok := ParseLine(raw, fields, tl); assert.True(t, ok) {
 		assert.Len(t, res, 2)
 		assert.Equal(t, 123, res["marp"])
 		assert.Equal(t, "sandman", res["pos 1"])
@@ -74,7 +76,7 @@ func TestParseLineBadDelimiterMissingRequired(t *testing.T) {
 	}
 
 	raw := "nothing:else enter=sandman marp:123"
-	_, ok := ParseLine(raw, fields, tl)
+	_, _, ok := ParseLine(raw, fields, tl)
 	assert.False(t, ok)
 }
 
@@ -88,7 +90,7 @@ func TestParseLineMissingRequiredTooShort(t *testing.T) {
 	}
 
 	raw := "nothing=else enter=sandman marp:123"
-	_, ok := ParseLine(raw, fields, tl)
+	_, _, ok := ParseLine(raw, fields, tl)
 	assert.False(t, ok)
 }
 
@@ -99,7 +101,7 @@ func TestParseLineUnknownFieldType(t *testing.T) {
 		Type:      FieldType("marp"),
 	}}
 	raw := "nothing=else enter=sandman marp:123"
-	if res, ok := ParseLine(raw, fields, tl); assert.True(t, ok) {
+	if _, res, ok := ParseLine(raw, fields, tl); assert.True(t, ok) {
 		assert.Len(t, res, 1)
 		assert.Equal(t, "else", res["nothing"])
 	}
@@ -117,9 +119,44 @@ func TestParseLineBadDelimiter(t *testing.T) {
 		},
 	}
 	raw := "nothing=else enter=sandman marp:123"
-	if res, ok := ParseLine(raw, fields, tl); assert.True(t, ok) {
+	if _, res, ok := ParseLine(raw, fields, tl); assert.True(t, ok) {
 		assert.Len(t, res, 1)
 		assert.Equal(t, "else", res["nothing"])
+	}
+}
+
+func TestParseURLLine(t *testing.T) {
+	fields := []FieldDef{
+		{
+			Position:  0,
+			Delimiter: "=",
+			Type:      "url",
+		},
+	}
+
+	raw := "url=https://nothing.else/matters"
+	if _, res, ok := ParseLine(raw, fields, tl); assert.True(t, ok) {
+		assert.Len(t, res, 1)
+		assert.Equal(t, "https://nothing.else", res["url"])
+	}
+}
+
+func TestParseLineWithTimestamp(t *testing.T) {
+	fields := []FieldDef{
+		{
+			Position: 0,
+			Type:     "timestamp",
+		},
+		{
+			Position: 1,
+		},
+	}
+
+	expectedTime := time.Unix(1483142458, 0)
+	raw := "@timestamp=1483142458 nothing=else"
+	if ts, res, ok := ParseLine(raw, fields, tl); assert.True(t, ok) {
+		assert.Len(t, res, 1)
+		assert.Equal(t, expectedTime.UnixNano(), ts.UnixNano())
 	}
 }
 
