@@ -30,7 +30,7 @@ func RootCmd() *cobra.Command {
 		Run:   run,
 	}
 
-	rootCmd.AddCommand(processCmd)
+	rootCmd.AddCommand(processCmd, versionCmd)
 
 	rootCmd.PersistentFlags().StringP("config", "c", "config.json", "a configruation file to use")
 	rootCmd.PersistentFlags().StringVarP(&defaultDelim, "delim", "d", "=", "the delimiter to use for fields")
