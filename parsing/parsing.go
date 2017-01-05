@@ -1,9 +1,11 @@
 package parsing
 
 import (
+	"net/url"
+	"strconv"
 	"strings"
 
-	"strconv"
+	"fmt"
 
 	"github.com/Sirupsen/logrus"
 )
@@ -15,6 +17,8 @@ const (
 	NumberType FieldType = "number"
 	FloatType  FieldType = "float"
 	BoolType   FieldType = "bool"
+
+	URLType FieldType = "url"
 )
 
 type FieldDef struct {
@@ -110,6 +114,8 @@ func ParseLine(raw string, fields []FieldDef, log *logrus.Entry) (map[string]int
 			val, err = strconv.ParseBool(rawVal)
 		case StringType, FieldType(""):
 			val = rawVal
+		case URLType:
+			val, err = extractDomain(rawVal)
 		default:
 			val = rawVal
 			log.Warnf("Unknown field type '%s' treating it as a string", def.Type)
@@ -130,4 +136,13 @@ func ParseLine(raw string, fields []FieldDef, log *logrus.Entry) (map[string]int
 	}
 
 	return dims, true
+}
+
+func extractDomain(rawURL string) (string, error) {
+	url, err := url.Parse(rawURL)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%s://%s", url.Scheme, url.Host), nil
 }

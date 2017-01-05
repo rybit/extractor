@@ -36,6 +36,10 @@
     }, {
       "position": 6
     }, {
+      "position": 7,
+      "type": "url",
+      "label": "domain"
+    }, {
       "position": 8
     }
   ]

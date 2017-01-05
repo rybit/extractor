@@ -123,6 +123,22 @@ func TestParseLineBadDelimiter(t *testing.T) {
 	}
 }
 
+func TestParseURLLine(t *testing.T) {
+	fields := []FieldDef{
+		{
+			Position:  0,
+			Delimiter: "=",
+			Type:      "url",
+		},
+	}
+
+	raw := "url=https://nothing.else/matters"
+	if res, ok := ParseLine(raw, fields, tl); assert.True(t, ok) {
+		assert.Len(t, res, 1)
+		assert.Equal(t, "https://nothing.else", res["url"])
+	}
+}
+
 func validate(t *testing.T, def *FieldDef, req bool, pos int, label, ftype FieldType, delim string) {
 	assert.EqualValues(t, pos, def.Position, "position  mismatch")
 	assert.EqualValues(t, label, def.Label, "label mismatch")
