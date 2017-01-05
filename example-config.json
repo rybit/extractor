@@ -20,8 +20,7 @@
   },
   "fields": [ {
       "position": 0,
-      "label": "timestamp",
-      "type": "number"
+      "type": "timestamp"
     }, {
       "position": 1,
       "type": "number"

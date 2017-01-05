@@ -1,5 +1,5 @@
-hash: 8ec5f6fbd11559d906e15900a77c454b43b24f5cc10302ed62f4b932e7a785be
-updated: 2016-12-30T16:34:41.812160958-08:00
+hash: 2d01bd91502684016401c568d8cf6543c7a6671fcfa505f73eea2c9e821de28f
+updated: 2017-01-05T11:06:10.223900233-08:00
 imports:
 - name: github.com/fsnotify/fsnotify
   version: fd9ec7deca8bf46ecd2a795baaacf2b3a9be1197
@@ -41,7 +41,7 @@ imports:
 - name: github.com/rybit/nats_logrus_hook
   version: 1236b915ecdc1963bf90fdfbb05fa815f5033a8c
 - name: github.com/rybit/nats_metrics
-  version: aec4a70381624a1b673f4abb6efd4349570f1ab9
+  version: c8576059aec91a33fec34d878958cbb1d9edf02b
 - name: github.com/Sirupsen/logrus
   version: d26492970760ca5d33129d2d799e34be5c4782eb
 - name: github.com/spf13/afero
@@ -53,7 +53,7 @@ imports:
 - name: github.com/spf13/cobra
   version: 1dd5ff2e11b6dca62fdcb275eb804b94607d8b06
 - name: github.com/spf13/jwalterweatherman
-  version: 33c24e77fb80341fe7130ee7c594256ff08ccc46
+  version: bccdd23ae5e51bd2b081814db093646c7af3d34d
 - name: github.com/spf13/pflag
   version: 25f8b5b07aece3207895bf19f7ab517eb3b22a40
 - name: github.com/spf13/viper

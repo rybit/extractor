@@ -98,9 +98,13 @@ func processFile(config *conf.Config, log *logrus.Entry, seek int, follow bool) 
 		stats.Increment("lines_seen")
 		text := strings.TrimSpace(line.Text)
 		if len(text) > 0 {
-			lineDims, ok := parsing.ParseLine(text, fields, log)
+			ts, lineDims, ok := parsing.ParseLine(text, fields, log)
 			if ok {
+				if !ts.IsZero() {
+					counter.SetTimestamp(ts)
+				}
 				counter.Count(convert(&lineDims))
+				counter.SetTimestamp(time.Time{})
 				stats.Increment("lines_parsed")
 			}
 		} else {
@@ -129,8 +133,15 @@ func extractFieldDefinitions(config *conf.Config, log *logrus.Entry) []parsing.F
 		}
 	}
 
+	hasTimestampField := false
 	fields := []parsing.FieldDef{}
 	for _, f := range fieldMap {
+		if f.Type == parsing.TimestampType {
+			if hasTimestampField {
+				log.Fatal("Already has a timestamp field specified - there can be only one")
+			}
+			hasTimestampField = true
+		}
 		fields = append(fields, f)
 	}
 
