@@ -14,7 +14,7 @@ type Config struct {
 }
 
 var statLock sync.Mutex
-var stats map[string]int64
+var stats = make(map[string]int64)
 
 func ReportStats(config *Config, dims *map[string]interface{}) {
 	if config == nil || config.Interval == 0 {

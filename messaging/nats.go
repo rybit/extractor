@@ -21,16 +21,21 @@ func (config *NatsConfig) ServerString() string {
 
 // ConnectToNats will do a TLS connection to the nats servers specified
 func ConnectToNats(config *NatsConfig, errHandler nats.ErrHandler) (*nats.Conn, error) {
-	tlsConfig, err := config.TLS.TLSConfig()
-	if err != nil {
-		return nil, err
+	options := []nats.Option{}
+	if config.TLS != nil {
+		tlsConfig, err := config.TLS.TLSConfig()
+		if err != nil {
+			return nil, err
+		}
+
+		options = append(options, nats.Secure(tlsConfig))
 	}
 
 	if errHandler != nil {
-		return nats.Connect(config.ServerString(), nats.Secure(tlsConfig), nats.ErrorHandler(errHandler))
+		options = append(options, nats.ErrorHandler(errHandler))
 	}
 
-	return nats.Connect(config.ServerString(), nats.Secure(tlsConfig))
+	return nats.Connect(config.ServerString(), options...)
 }
 
 func ErrorHandler(log *logrus.Entry) nats.ErrHandler {
