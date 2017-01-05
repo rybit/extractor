@@ -17,11 +17,10 @@ type Config struct {
 	LogConf  LoggingConfig        `mapstructure:"log_conf"`
 
 	RetrySec   int                     `mapstructure:"retry_sec"`
-	Path       string                  `mapstructure:"path"`
 	Subject    string                  `mapstructure:"subject"`
 	Fields     []parsing.FieldDef      `mapstructure:"fields"`
 	Dims       *map[string]interface{} `mapstructure:"dims"`
-	MetricName string                  `mpastructure:"metric_name"`
+	MetricName string                  `mapstructure:"metric_name"`
 
 	ReportConf *stats.Config `mapstructure:"stats_conf"`
 }

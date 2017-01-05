@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"io"
-	"log"
 	"os"
 	"strings"
 	"time"
@@ -20,30 +19,44 @@ import (
 )
 
 const defaultRetrySec = 5
+const defaultReportSec = 60
 
 var defaultDelim string
 var cmdLineFields = []string{}
 
 func RootCmd() *cobra.Command {
-	rootCmd := &cobra.Command{
-		Short: "streamer",
+	rootCmd := &cobra.Command{}
+
+	followCmd := &cobra.Command{
+		Short: "follow <path>",
+		Use:   "follow",
 		Run:   run,
 	}
 
-	rootCmd.AddCommand(processCmd, versionCmd)
+	rootCmd.AddCommand(followCmd, processCmd, versionCmd)
 
 	rootCmd.PersistentFlags().StringP("config", "c", "config.json", "a configruation file to use")
 	rootCmd.PersistentFlags().StringVarP(&defaultDelim, "delim", "d", "=", "the delimiter to use for fields")
 	rootCmd.PersistentFlags().StringSliceVarP(&cmdLineFields, "field", "f", cmdLineFields, "field overrides in the form: 'TODO'")
+
 	return rootCmd
 }
 
 func run(cmd *cobra.Command, args []string) {
 	config, log := setup(cmd)
-	processFile(config, log, io.SeekEnd, true)
+
+	if len(args) != 1 {
+		log.Fatal("Must provide a path to consume")
+	}
+
+	processFile(config, args[0], log, io.SeekEnd, true)
 }
 
-func processFile(config *conf.Config, log *logrus.Entry, seek int, follow bool) {
+func processFile(config *conf.Config, path string, log *logrus.Entry, seek int, follow bool) {
+	if path == "" {
+		log.Fatal("Must provide a path to consume")
+	}
+
 	fields := extractFieldDefinitions(config, log)
 	if len(fields) == 0 {
 		log.Fatal("Must provide at least one field to extract")
@@ -53,15 +66,15 @@ func processFile(config *conf.Config, log *logrus.Entry, seek int, follow bool) 
 
 	notFound := true
 	for notFound {
-		if _, err := os.Stat(config.Path); os.IsNotExist(err) {
-			log.Warnf("File %s does not exist, will check again in %d seconds", config.RetrySec)
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			log.Warnf("File %s does not exist, will check again in %d seconds", path, config.RetrySec)
 			<-time.After(time.Duration(config.RetrySec) * time.Second)
 		} else {
 			notFound = false
 		}
 	}
 
-	log.WithField("path", config.Path).Info("Found file to process")
+	log.WithField("path", path).Info("Found file to process")
 
 	tailConfig := tail.Config{
 		Logger:      log,
@@ -83,17 +96,19 @@ func processFile(config *conf.Config, log *logrus.Entry, seek int, follow bool) 
 	}
 
 	log.WithFields(logrus.Fields{
-		"follow":   follow,
-		"position": pos,
+		"follow":      follow,
+		"position":    pos,
+		"metric_name": config.MetricName,
+		"subject":     config.Subject,
 	}).Info("Starting to tail file")
-	t, err := tail.TailFile(config.Path, tailConfig)
+	t, err := tail.TailFile(path, tailConfig)
 	if err != nil {
-		log.WithField("path", config.Path).WithError(err).Fatal("Failed to create tail")
+		log.WithField("path", path).WithError(err).Fatal("Failed to create tail")
 	}
 
 	counter := metrics.NewCounter(config.MetricName, convert(config.Dims))
 
-	stats.ReportStats(config.ReportConf, config.Dims)
+	stats.ReportStats(config.ReportConf, log, config.Dims)
 	for line := range t.Lines {
 		stats.Increment("lines_seen")
 		text := strings.TrimSpace(line.Text)
@@ -161,38 +176,47 @@ func setup(cmd *cobra.Command) (*conf.Config, *logrus.Entry) {
 	if err != nil {
 		logrus.Fatalf("Failed to load configuration: %v", err)
 	}
-
-	logger, err := conf.ConfigureLogging(&config.LogConf)
+	log, err := conf.ConfigureLogging(&config.LogConf)
 	if err != nil {
 		log.Fatalf("Failed to configure logging : %v", err)
 	}
-	if config.Path == "" {
-		logger.Fatal("Must provide a path to process")
-	}
 
-	nc, err := messaging.ConnectToNats(&config.NatsConf, messaging.ErrorHandler(logger))
-	if err != nil {
-		logger.WithError(err).Fatal("Failed to connect to nats")
+	if config.MetricName == "" {
+		log.Fatal("Must provide a metric name")
 	}
-	logger.Debug("Connected to NATS")
 
 	if config.Subject == "" {
-		logger.Fatal("Must provide a subject for metrics")
+		log.Fatal("Must provide a subject for metrics")
 	}
 
-	if err := metrics.Init(nc, config.Subject); err != nil {
-		logger.WithError(err).Fatal("Failed to configure metrics lib")
+	if config.ReportConf != nil {
+		if config.ReportConf.Interval == 0 {
+			config.ReportConf.Interval = defaultReportSec
+		}
+		if config.ReportConf.Subject == "" {
+			log.Fatal("When reporting is enabled, a subject is required")
+		}
 	}
-	logger.WithField("metrics_subject", config.Subject).Debug("Configured metrics lib")
+
+	nc, err := messaging.ConnectToNats(&config.NatsConf, messaging.ErrorHandler(log))
+	if err != nil {
+		log.WithError(err).Fatal("Failed to connect to nats")
+	}
+	log.Debug("Connected to NATS")
+
+	if err := metrics.Init(nc, config.Subject); err != nil {
+		log.WithError(err).Fatal("Failed to configure metrics lib")
+	}
+	log.WithField("metrics_subject", config.Subject).Debug("Configured metrics lib")
 
 	if config.NatsConf.LogSubject != "" {
 		logrus.AddHook(nhook.NewNatsHook(nc, config.NatsConf.LogSubject))
-		logger.WithField("log_subject", config.NatsConf.LogSubject).Debug("Configured nats hook into logrus")
+		log.WithField("log_subject", config.NatsConf.LogSubject).Debug("Configured nats hook into logrus")
 	}
 
 	if config.RetrySec == 0 {
 		config.RetrySec = defaultRetrySec
 	}
 
-	return config, logger
+	return config, log
 }
