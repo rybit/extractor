@@ -13,14 +13,13 @@ import (
 )
 
 type Config struct {
-	NatsConf messaging.NatsConfig `mapstructure:"nats_conf"`
-	LogConf  LoggingConfig        `mapstructure:"log_conf"`
+	NatsConf *messaging.NatsConfig `mapstructure:"nats_conf"`
+	LogConf  LoggingConfig         `mapstructure:"log_conf"`
 
-	RetrySec   int                     `mapstructure:"retry_sec"`
-	Subject    string                  `mapstructure:"subject"`
-	Fields     []parsing.FieldDef      `mapstructure:"fields"`
-	Dims       *map[string]interface{} `mapstructure:"dims"`
-	MetricName string                  `mapstructure:"metric_name"`
+	RetrySec   int                           `mapstructure:"retry_sec"`
+	Subject    string                        `mapstructure:"subject"`
+	MetricDefs map[string][]parsing.FieldDef `mapstructure:"metrics"`
+	Dims       *map[string]interface{}       `mapstructure:"dims"`
 
 	ReportConf *stats.Config `mapstructure:"stats_conf"`
 }

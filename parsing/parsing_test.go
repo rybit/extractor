@@ -59,10 +59,11 @@ func TestParseLineNiceLine(t *testing.T) {
 		},
 	}
 	raw := "nothing=else enter=sandman marp:123"
-	if _, res, ok := ParseLine(raw, fields, tl); assert.True(t, ok) {
-		assert.Len(t, res, 2)
-		assert.Equal(t, 123, res["marp"])
-		assert.Equal(t, "sandman", res["pos 1"])
+	if res, ok := ParseLine(raw, fields, tl); assert.True(t, ok) {
+		assert.Len(t, res.Dims, 2)
+		assert.Nil(t, res.Timestamp)
+		assert.Equal(t, 123, res.Dims["marp"])
+		assert.Equal(t, "sandman", res.Dims["pos 1"])
 	}
 }
 
@@ -76,7 +77,7 @@ func TestParseLineBadDelimiterMissingRequired(t *testing.T) {
 	}
 
 	raw := "nothing:else enter=sandman marp:123"
-	_, _, ok := ParseLine(raw, fields, tl)
+	_, ok := ParseLine(raw, fields, tl)
 	assert.False(t, ok)
 }
 
@@ -90,7 +91,7 @@ func TestParseLineMissingRequiredTooShort(t *testing.T) {
 	}
 
 	raw := "nothing=else enter=sandman marp:123"
-	_, _, ok := ParseLine(raw, fields, tl)
+	_, ok := ParseLine(raw, fields, tl)
 	assert.False(t, ok)
 }
 
@@ -101,9 +102,10 @@ func TestParseLineUnknownFieldType(t *testing.T) {
 		Type:      FieldType("marp"),
 	}}
 	raw := "nothing=else enter=sandman marp:123"
-	if _, res, ok := ParseLine(raw, fields, tl); assert.True(t, ok) {
-		assert.Len(t, res, 1)
-		assert.Equal(t, "else", res["nothing"])
+	if res, ok := ParseLine(raw, fields, tl); assert.True(t, ok) {
+		assert.Len(t, res.Dims, 1)
+		assert.Nil(t, res.Timestamp)
+		assert.Equal(t, "else", res.Dims["nothing"])
 	}
 }
 
@@ -119,9 +121,10 @@ func TestParseLineBadDelimiter(t *testing.T) {
 		},
 	}
 	raw := "nothing=else enter=sandman marp:123"
-	if _, res, ok := ParseLine(raw, fields, tl); assert.True(t, ok) {
-		assert.Len(t, res, 1)
-		assert.Equal(t, "else", res["nothing"])
+	if res, ok := ParseLine(raw, fields, tl); assert.True(t, ok) {
+		assert.Len(t, res.Dims, 1)
+		assert.Nil(t, res.Timestamp)
+		assert.Equal(t, "else", res.Dims["nothing"])
 	}
 }
 
@@ -135,9 +138,10 @@ func TestParseURLLine(t *testing.T) {
 	}
 
 	raw := "url=https://nothing.else/matters"
-	if _, res, ok := ParseLine(raw, fields, tl); assert.True(t, ok) {
-		assert.Len(t, res, 1)
-		assert.Equal(t, "https://nothing.else", res["url"])
+	if res, ok := ParseLine(raw, fields, tl); assert.True(t, ok) {
+		assert.Len(t, res.Dims, 1)
+		assert.Nil(t, res.Timestamp)
+		assert.Equal(t, "https://nothing.else", res.Dims["url"])
 	}
 }
 
@@ -154,10 +158,45 @@ func TestParseLineWithTimestamp(t *testing.T) {
 
 	expectedTime := time.Unix(1483142458, 0)
 	raw := "@timestamp=1483142458 nothing=else"
-	if ts, res, ok := ParseLine(raw, fields, tl); assert.True(t, ok) {
-		assert.Len(t, res, 1)
-		assert.Equal(t, expectedTime.UnixNano(), ts.UnixNano())
+	if res, ok := ParseLine(raw, fields, tl); assert.True(t, ok) {
+		assert.Len(t, res.Dims, 1)
+		assert.Equal(t, expectedTime.UnixNano(), res.Timestamp.UnixNano())
 	}
+}
+
+func TestParseLineWithGoodValue(t *testing.T) {
+	fields := []FieldDef{
+		{
+			Position: 0,
+			Type:     "value",
+		},
+		{
+			Position: 1,
+		},
+	}
+
+	raw := "size=1483142458 nothing=else"
+	if res, ok := ParseLine(raw, fields, tl); assert.True(t, ok) {
+		assert.Len(t, res.Dims, 1)
+		assert.Nil(t, res.Timestamp)
+		assert.EqualValues(t, res.Value, 1483142458)
+	}
+}
+
+func TestParseLineWithBadValue(t *testing.T) {
+	fields := []FieldDef{
+		{
+			Position: 0,
+			Type:     "value",
+		},
+		{
+			Position: 1,
+		},
+	}
+
+	raw := "size=this-is-not-a-number nothing=else"
+	_, ok := ParseLine(raw, fields, tl)
+	assert.False(t, ok)
 }
 
 func validate(t *testing.T, def *FieldDef, req bool, pos int, label, ftype FieldType, delim string) {

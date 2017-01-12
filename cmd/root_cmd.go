@@ -12,6 +12,8 @@ import (
 	"github.com/rybit/nats_metrics"
 	"github.com/spf13/cobra"
 
+	"encoding/json"
+
 	"github.com/rybit/extractor/conf"
 	"github.com/rybit/extractor/messaging"
 	"github.com/rybit/extractor/parsing"
@@ -57,12 +59,11 @@ func processFile(config *conf.Config, path string, log *logrus.Entry, seek int, 
 		log.Fatal("Must provide a path to consume")
 	}
 
-	fields := extractFieldDefinitions(config, log)
-	if len(fields) == 0 {
-		log.Fatal("Must provide at least one field to extract")
+	if config.Dims != nil {
+		for k, v := range *config.Dims {
+			metrics.AddDimension(k, v)
+		}
 	}
-
-	log.Debug("Extracted fields to process")
 
 	notFound := true
 	for notFound {
@@ -96,71 +97,50 @@ func processFile(config *conf.Config, path string, log *logrus.Entry, seek int, 
 	}
 
 	log.WithFields(logrus.Fields{
-		"follow":      follow,
-		"position":    pos,
-		"metric_name": config.MetricName,
-		"subject":     config.Subject,
+		"follow":   follow,
+		"position": pos,
+		"subject":  config.Subject,
 	}).Info("Starting to tail file")
 	t, err := tail.TailFile(path, tailConfig)
 	if err != nil {
 		log.WithField("path", path).WithError(err).Fatal("Failed to create tail")
 	}
-
-	counter := metrics.NewCounter(config.MetricName, convert(config.Dims))
-
 	stats.ReportStats(config.ReportConf, log, config.Dims)
-	for line := range t.Lines {
+
+	processLines(t.Lines, config.MetricDefs, log)
+
+	log.Info("Done with extraction ~ shutting down")
+}
+
+func processLines(lines chan *tail.Line, defs map[string][]parsing.FieldDef, log *logrus.Entry) {
+	counters := make(map[string]metrics.Counter)
+	for name := range defs {
+		counters[name] = metrics.NewCounter(name, nil)
+	}
+	zero := time.Time{}
+	for line := range lines {
 		stats.Increment("lines_seen")
 		text := strings.TrimSpace(line.Text)
 		if len(text) > 0 {
-			ts, lineDims, ok := parsing.ParseLine(text, fields, log)
-			if ok {
-				if !ts.IsZero() {
-					counter.SetTimestamp(ts)
+			stats.Increment("lines_seen")
+			for name, fields := range defs {
+				c := counters[name]
+				parsed, ok := parsing.ParseLine(text, fields, log)
+				if ok {
+					if parsed.Timestamp != nil {
+						c.SetTimestamp(*parsed.Timestamp)
+					}
+
+					c.CountN(parsed.Value, convert(&parsed.Dims))
+					c.SetTimestamp(zero)
+				} else {
+					stats.Increment("failed_extraction")
 				}
-				counter.Count(convert(&lineDims))
-				counter.SetTimestamp(time.Time{})
-				stats.Increment("lines_parsed")
 			}
 		} else {
 			stats.Increment("blank_lines_seen")
 		}
 	}
-
-	log.Info("Done with extraction ~ shutting down")
-}
-
-func extractFieldDefinitions(config *conf.Config, log *logrus.Entry) []parsing.FieldDef {
-	fieldMap := make(map[int]parsing.FieldDef)
-	for _, def := range config.Fields {
-		fieldMap[def.Position] = def
-	}
-	for _, arg := range cmdLineFields {
-		override := parsing.ExtractDefinition(arg, defaultDelim, log)
-		if override != nil {
-			log.WithFields(logrus.Fields{
-				"position": override.Position,
-				"label":    override.Label,
-				"type":     override.Type,
-				"required": override.Required,
-			}).Debug("Applying field override")
-			fieldMap[override.Position] = *override
-		}
-	}
-
-	hasTimestampField := false
-	fields := []parsing.FieldDef{}
-	for _, f := range fieldMap {
-		if f.Type == parsing.TimestampType {
-			if hasTimestampField {
-				log.Fatal("Already has a timestamp field specified - there can be only one")
-			}
-			hasTimestampField = true
-		}
-		fields = append(fields, f)
-	}
-
-	return fields
 }
 
 func convert(in *map[string]interface{}) *metrics.DimMap {
@@ -181,8 +161,8 @@ func setup(cmd *cobra.Command) (*conf.Config, *logrus.Entry) {
 		log.Fatalf("Failed to configure logging : %v", err)
 	}
 
-	if config.MetricName == "" {
-		log.Fatal("Must provide a metric name")
+	if len(config.MetricDefs) == 0 {
+		log.Fatal("Must provide at least one metric to extract")
 	}
 
 	if config.Subject == "" {
@@ -198,20 +178,31 @@ func setup(cmd *cobra.Command) (*conf.Config, *logrus.Entry) {
 		}
 	}
 
-	nc, err := messaging.ConnectToNats(&config.NatsConf, messaging.ErrorHandler(log))
-	if err != nil {
-		log.WithError(err).Fatal("Failed to connect to nats")
-	}
-	log.Debug("Connected to NATS")
+	if config.NatsConf != nil {
+		nc, err := messaging.ConnectToNats(config.NatsConf, messaging.ErrorHandler(log))
+		if err != nil {
+			log.WithError(err).Fatal("Failed to connect to nats")
+		}
+		log.Debug("Connected to NATS")
 
-	if err := metrics.Init(nc, config.Subject); err != nil {
-		log.WithError(err).Fatal("Failed to configure metrics lib")
-	}
-	log.WithField("metrics_subject", config.Subject).Debug("Configured metrics lib")
+		if err := metrics.Init(nc, config.Subject); err != nil {
+			log.WithError(err).Fatal("Failed to configure metrics lib")
+		}
+		log.WithField("metrics_subject", config.Subject).Debug("Configured metrics lib")
 
-	if config.NatsConf.LogSubject != "" {
-		logrus.AddHook(nhook.NewNatsHook(nc, config.NatsConf.LogSubject))
-		log.WithField("log_subject", config.NatsConf.LogSubject).Debug("Configured nats hook into logrus")
+		if config.NatsConf.LogSubject != "" {
+			logrus.AddHook(nhook.NewNatsHook(nc, config.NatsConf.LogSubject))
+			log.WithField("log_subject", config.NatsConf.LogSubject).Debug("Configured nats hook into logrus")
+		}
+	} else {
+		log.Debug("No nats config specified - going to output using logger")
+		metrics.Init(nil, "nowhere")
+		metrics.Trace(func(m *metrics.RawMetric) {
+			bs, err := json.Marshal(m)
+			if err == nil {
+				log.Info(string(bs))
+			}
+		})
 	}
 
 	if config.RetrySec == 0 {

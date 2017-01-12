@@ -20,6 +20,7 @@ const (
 	FloatType     FieldType = "float"
 	BoolType      FieldType = "bool"
 	URLType       FieldType = "url"
+	ValueType     FieldType = "value"
 	TimestampType FieldType = "timestamp"
 )
 
@@ -32,6 +33,12 @@ type FieldDef struct {
 	Label     string    `mapstructure:"label"`
 	Delimiter string    `mapstructure:"delim"`
 	Required  bool      `mapstructure:"required"`
+}
+
+type ParsedLine struct {
+	Timestamp *time.Time
+	Value     int64
+	Dims      map[string]interface{}
 }
 
 func ExtractDefinition(raw, delim string, log *logrus.Entry) *FieldDef {
@@ -73,16 +80,21 @@ func ExtractDefinition(raw, delim string, log *logrus.Entry) *FieldDef {
 	return def
 }
 
-func ParseLine(raw string, fields []FieldDef, log *logrus.Entry) (time.Time, map[string]interface{}, bool) {
+func ParseLine(raw string, fields []FieldDef, log *logrus.Entry) (*ParsedLine, bool) {
+	line := &ParsedLine{
+		Dims:  make(map[string]interface{}),
+		Value: 1,
+	}
+
 	timestamp := time.Time{}
-	dims := make(map[string]interface{})
 	parts := strings.Split(raw, " ")
 
 	for _, def := range fields {
-		if def.Position > len(parts) {
-			if def.Required {
+		required := def.Required
+		if def.Position >= len(parts) {
+			if required {
 				log.Warnf("Missing required field at position %d, there are only %d entries", def.Position, len(parts))
-				return timestamp, nil, false
+				return nil, false
 			}
 			// we don't care about this field
 			continue
@@ -97,18 +109,28 @@ func ParseLine(raw string, fields []FieldDef, log *logrus.Entry) (time.Time, map
 		rawParts := strings.SplitN(part, delim, 2)
 		if len(rawParts) != 2 {
 			log.Warnf("Failed to split the field '%s' using delimiter '%s'", part, def.Delimiter)
-			if def.Required {
-				return timestamp, nil, false
+			if required {
+				return nil, false
 			}
 			continue
 		}
 		key := rawParts[0]
 		rawVal := rawParts[1]
 
+		isDim := true
 		// parse the value component
 		var val interface{}
 		var err error
 		switch def.Type {
+		case ValueType:
+			required = true
+			isDim = false
+			val, err = strconv.Atoi(rawVal)
+			line.Value = int64(val.(int))
+		case TimestampType:
+			isDim = false
+			timestamp, err = extractTime(rawVal)
+			line.Timestamp = &timestamp
 		case NumberType:
 			val, err = strconv.Atoi(rawVal)
 		case FloatType:
@@ -119,15 +141,6 @@ func ParseLine(raw string, fields []FieldDef, log *logrus.Entry) (time.Time, map
 			val = rawVal
 		case URLType:
 			val, err = extractDomain(rawVal)
-		case TimestampType:
-			timestamp, err = extractTime(rawVal)
-			if err != nil {
-				log.WithError(err).Warnf("Failed to convert '%s' to a %s", rawVal, def.Type)
-				if def.Required {
-					return timestamp, nil, false
-				}
-			}
-			continue
 		default:
 			val = rawVal
 			log.Warnf("Unknown field type '%s' treating it as a string", def.Type)
@@ -135,19 +148,19 @@ func ParseLine(raw string, fields []FieldDef, log *logrus.Entry) (time.Time, map
 
 		if err != nil {
 			log.WithError(err).Warnf("Failed to convert '%s' to a %s", rawVal, def.Type)
-			if def.Required {
-				return timestamp, nil, false
+			if required {
+				return nil, false
 			}
-		} else {
-			if def.Label != "" {
-				dims[def.Label] = val
-			} else {
-				dims[key] = val
+		} else if isDim {
+			label := def.Label
+			if label == "" {
+				label = key
 			}
+			line.Dims[label] = val
 		}
 	}
 
-	return timestamp, dims, true
+	return line, true
 }
 
 func extractDomain(rawURL string) (string, error) {

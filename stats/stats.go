@@ -19,6 +19,7 @@ var stats = make(map[string]int64)
 
 func ReportStats(config *Config, log *logrus.Entry, dims *map[string]interface{}) {
 	if config == nil || config.Interval == 0 {
+		log.Debug("Skipping stats reporting because it is configured off")
 		return
 	}
 
