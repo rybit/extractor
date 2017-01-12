@@ -16,3 +16,14 @@ deps: ## Install dependencies.
 
 test: ## Run tests.
 	go test -v `go list ./... | grep -v /vendor/`
+
+release:
+	@if [ "$(strip $(VERSION))" == "" ]; then echo "No version provided"; exit 1; fi
+	go build -ldflags "-X github.com/rybit/extractor/cmd.Version=`git rev-parse HEAD`" -o extractor-${VERSION}
+	tar -czf extractor-darwin-amd64-${VERSION}.tar.gz extractor-${VERSION}
+	GOOS=linux GOARCH=amd64 go build -ldflags "-X github.com/rybit/extractor/cmd.Version=`git rev-parse HEAD`" -o extractor-${VERSION}
+	tar -czf extractor-linux-amd64-${VERSION}.tar.gz extractor-${VERSION}
+	rm extractor-${VERSION}
+
+
+
