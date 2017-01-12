@@ -16,12 +16,17 @@ type Config struct {
 	NatsConf *messaging.NatsConfig `mapstructure:"nats_conf"`
 	LogConf  LoggingConfig         `mapstructure:"log_conf"`
 
-	RetrySec   int                           `mapstructure:"retry_sec"`
-	Subject    string                        `mapstructure:"subject"`
-	MetricDefs map[string][]parsing.FieldDef `mapstructure:"metrics"`
-	Dims       *map[string]interface{}       `mapstructure:"dims"`
+	RetrySec int    `mapstructure:"retry_sec"`
+	Subject  string `mapstructure:"subject"`
 
-	ReportConf *stats.Config `mapstructure:"stats_conf"`
+	Dims       *map[string]interface{} `mapstructure:"dims"`
+	Metrics    []MetricDef             `mapstructure:"metrics"`
+	ReportConf *stats.Config           `mapstructure:"stats_conf"`
+}
+
+type MetricDef struct {
+	Name   string             `mapstructure:"name"`
+	Fields []parsing.FieldDef `mapstructure:"fields"`
 }
 
 // LoadConfig loads the config from a file if specified, otherwise from the environment

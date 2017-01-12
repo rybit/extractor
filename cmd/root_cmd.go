@@ -107,15 +107,15 @@ func processFile(config *conf.Config, path string, log *logrus.Entry, seek int, 
 	}
 	stats.ReportStats(config.ReportConf, log, config.Dims)
 
-	processLines(t.Lines, config.MetricDefs, log)
+	processLines(t.Lines, config.Metrics, log)
 
 	log.Info("Done with extraction ~ shutting down")
 }
 
-func processLines(lines chan *tail.Line, defs map[string][]parsing.FieldDef, log *logrus.Entry) {
+func processLines(lines chan *tail.Line, defs []conf.MetricDef, log *logrus.Entry) {
 	counters := make(map[string]metrics.Counter)
-	for name := range defs {
-		counters[name] = metrics.NewCounter(name, nil)
+	for _, m := range defs {
+		counters[m.Name] = metrics.NewCounter(m.Name, nil)
 	}
 	zero := time.Time{}
 	for line := range lines {
@@ -123,9 +123,9 @@ func processLines(lines chan *tail.Line, defs map[string][]parsing.FieldDef, log
 		text := strings.TrimSpace(line.Text)
 		if len(text) > 0 {
 			stats.Increment("lines_seen")
-			for name, fields := range defs {
-				c := counters[name]
-				parsed, ok := parsing.ParseLine(text, fields, log)
+			for _, m := range defs {
+				c := counters[m.Name]
+				parsed, ok := parsing.ParseLine(text, m.Fields, log)
 				if ok {
 					if parsed.Timestamp != nil {
 						c.SetTimestamp(*parsed.Timestamp)
@@ -161,7 +161,7 @@ func setup(cmd *cobra.Command) (*conf.Config, *logrus.Entry) {
 		log.Fatalf("Failed to configure logging : %v", err)
 	}
 
-	if len(config.MetricDefs) == 0 {
+	if len(config.Metrics) == 0 {
 		log.Fatal("Must provide at least one metric to extract")
 	}
 

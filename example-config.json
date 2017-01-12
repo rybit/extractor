@@ -8,65 +8,65 @@
     "log_file": ""
   },
   "retry_sec": 10,
-  "path": "./user-traffic-sample.log",
   "subject": "metrics.trafficserver.local",
   "dims": {
     "testing": true,
     "hostname": "localhost",
     "version": "0.0.1"
   },
-  "metric_name": "trafficserver.site_view",
   "stats_conf": {
   },
-  "metrics": {
-    "trafficserver.site_view":[ {
-        "position": 0,
-        "label": "timestamp",
-        "type": "timestamp"
+  "metrics": [{
+    "name": "ats.request_count",
+    "fields": [ {
+      "position": 0,
+      "label": "timestamp",
+      "type": "timestamp"
       }, {
-        "position": 1,
-        "label": "timing",
-        "type": "number"
+      "position": 1,
+      "label": "timing",
+      "type": "number"
       }, {
-        "position": 3,
-        "label": "result"
+      "position": 3,
+      "label": "result"
       }, {
-        "position": 4,
-        "label": "status",
-        "type": "number"
+      "position": 4,
+      "label": "status",
+      "type": "number"
       }, {
-        "position": 6,
-        "label": "method"
+      "position": 6,
+      "label": "method"
       }, {
-        "position": 7,
-        "type": "url",
-        "label": "domain"
+      "position": 7,
+      "type": "url",
+      "label": "domain"
       }, {
-        "position": 8,
-        "label": "content_type"
-      }
-    ],
-    "trafficserver.site_size": [{
-        "position": 0,
-        "type": "timestamp"
-      }, {
-        "position": 3,
-        "label": "result"
-      }, {
-        "position": 5,
-        "label": "size",
-        "type": "value"
-      }, {
-        "position": 6,
-        "label": "method"
-      }, {
-        "position": 7,
-        "type": "url",
-        "label": "domain"
-      }, {
-        "position": 8,
-        "label": "content_type"
+      "position": 8,
+      "label": "content_type"
       }
     ]
-  }
+  }, {
+    "name": "ats.request_size",
+    "fields": [{
+      "position": 0,
+      "type": "timestamp"
+    }, {
+      "position": 3,
+      "label": "result"
+    }, {
+      "position": 5,
+      "label": "size",
+      "type": "value"
+    }, {
+      "position": 6,
+      "label": "method"
+    }, {
+      "position": 7,
+      "type": "url",
+      "label": "domain"
+    }, {
+      "position": 8,
+      "label": "content_type"
+    }]
+  }]
 }
