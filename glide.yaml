@@ -2,8 +2,6 @@ package: github.com/rybit/extractor
 import:
 - package: github.com/Sirupsen/logrus
   version: v0.11.0
-- package: github.com/hpcloud/tail
-  version: v1.0.0
 - package: github.com/nats-io/nats
   version: v1.2.2
 - package: github.com/rybit/nats_logrus_hook

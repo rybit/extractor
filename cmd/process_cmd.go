@@ -3,6 +3,8 @@ package cmd
 import (
 	"io"
 
+	"github.com/rybit/extractor/tail"
+	"github.com/rybit/nats_metrics"
 	"github.com/spf13/cobra"
 )
 
@@ -19,5 +21,11 @@ func processSingleFile(cmd *cobra.Command, args []string) {
 		log.Fatal("Must provide a path to consume")
 	}
 
-	processFile(config, args[0], log, io.SeekStart, false)
+	if config.Dims != nil {
+		for k, v := range *config.Dims {
+			metrics.AddDimension(k, v)
+		}
+	}
+
+	tail.ProcessFile(config, args[0], log, io.SeekStart, false)
 }
