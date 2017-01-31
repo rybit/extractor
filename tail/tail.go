@@ -14,31 +14,6 @@ import (
 	"github.com/rybit/extractor/stats"
 )
 
-func FollowForever(config *conf.Config, path string, log *logrus.Entry) (chan bool, chan bool) {
-	stop := make(chan bool)
-	stopped := make(chan bool)
-
-	go func() {
-		where := io.SeekEnd
-		for {
-			select {
-			case <-stop:
-				log.Info("Shutting down by request")
-				stopped <- true
-				return
-			default:
-				log.Info("Starting to process file")
-				ProcessFile(config, path, log, where, true)
-				where = io.SeekStart
-
-				log.Info("Finished processing the file, it was probably rolled. Going to retry")
-			}
-		}
-	}()
-
-	return stop, stopped
-}
-
 func ProcessFile(config *conf.Config, path string, log *logrus.Entry, seek int, follow bool) chan bool {
 	if path == "" {
 		log.Fatal("Must provide a path to consume")

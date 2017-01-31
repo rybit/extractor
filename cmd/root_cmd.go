@@ -8,6 +8,8 @@ import (
 
 	"encoding/json"
 
+	"io"
+
 	"github.com/rybit/extractor/conf"
 	"github.com/rybit/extractor/messaging"
 	"github.com/rybit/extractor/stats"
@@ -51,9 +53,9 @@ func run(cmd *cobra.Command, args []string) {
 		}
 	}
 	stats.ReportStats(config.ReportConf, log, config.Dims)
-	_, stopped := tail.FollowForever(config, args[0], log)
+	tail.ProcessFile(config, args[0], log, io.SeekStart, true)
 
-	<-stopped
+	select {}
 }
 
 func setup(cmd *cobra.Command) (*conf.Config, *logrus.Entry) {
