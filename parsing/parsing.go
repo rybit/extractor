@@ -14,6 +14,8 @@ import (
 
 type FieldType string
 
+const nanoInMsec int64 = 1000000
+
 const (
 	StringType    FieldType = "string"
 	NumberType    FieldType = "number"
@@ -33,6 +35,10 @@ type FieldDef struct {
 	Label     string    `mapstructure:"label"`
 	Delimiter string    `mapstructure:"delim"`
 	Required  bool      `mapstructure:"required"`
+
+	// optional for timestamps. It supports
+	// shorthand values "msec", "nano", "sec", or a golang format
+	TimestampType string `mapstructure:"timestamp_type"`
 }
 
 type ParsedLine struct {
@@ -129,7 +135,7 @@ func ParseLine(raw string, fields []FieldDef, log *logrus.Entry) (*ParsedLine, b
 			line.Value = int64(val.(int))
 		case TimestampType:
 			isDim = false
-			timestamp, err = extractTime(rawVal)
+			timestamp, err = extractTime(rawVal, def.TimestampType)
 			line.Timestamp = &timestamp
 		case NumberType:
 			val, err = strconv.Atoi(rawVal)
@@ -172,22 +178,34 @@ func extractDomain(rawURL string) (string, error) {
 	return fmt.Sprintf("%s://%s", url.Scheme, url.Host), nil
 }
 
-func extractTime(rawVal string) (time.Time, error) {
-	// could be a number
-	if num, err := strconv.Atoi(rawVal); err == nil {
-		return time.Unix(int64(num), 0), nil
-	}
-
-	// try a few formats
-	formats := []string{
-		time.RFC822Z, time.RFC822, time.RFC1123Z, time.RFC1123,
-		time.RFC3339Nano, time.RFC3339, time.RFC850,
-		time.ANSIC, time.RubyDate, time.UnixDate,
-	}
-	for _, layout := range formats {
-		if ts, err := time.Parse(layout, rawVal); err == nil {
-			return ts, nil
+func extractTime(rawVal, format string) (time.Time, error) {
+	switch format {
+	case "":
+		// try a few formats
+		formats := []string{
+			time.RFC822Z, time.RFC822, time.RFC1123Z, time.RFC1123,
+			time.RFC3339Nano, time.RFC3339, time.RFC850,
+			time.ANSIC, time.RubyDate, time.UnixDate,
 		}
+		for _, layout := range formats {
+			if ts, err := time.Parse(layout, rawVal); err == nil {
+				return ts, nil
+			}
+		}
+	case "msec", "nano", "sec":
+		// could be a number - convert it to int64
+		if num, err := strconv.ParseInt(rawVal, 10, 64); err == nil {
+			switch format {
+			case "nano":
+				return time.Unix(0, num), nil
+			case "msec":
+				return time.Unix(0, num*nanoInMsec), nil
+			case "sec":
+				return time.Unix(num, 0), nil
+			}
+		}
+	default:
+		return time.Parse(format, rawVal)
 	}
 
 	return time.Time{}, fmt.Errorf("Failed to parse timestamp from '%s'", rawVal)
