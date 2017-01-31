@@ -4,6 +4,8 @@ import (
 	"sync"
 	"time"
 
+	"encoding/json"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/rybit/nats_metrics"
 )
@@ -22,10 +24,11 @@ func ReportStats(config *Config, log *logrus.Entry, dims *map[string]interface{}
 		log.Debug("Skipping stats reporting because it is configured off")
 		return
 	}
-
+	fields := logrus.Fields{}
 	dimMap := metrics.DimMap{}
 	for k, v := range *dims {
 		dimMap[k] = v
+		fields[k] = v
 	}
 
 	go func() {
@@ -38,14 +41,20 @@ func ReportStats(config *Config, log *logrus.Entry, dims *map[string]interface{}
 		for range ticks {
 			go func() {
 				statLock.Lock()
-				for k, v := range stats {
-					name := config.Prefix
-					if name != "" {
-						name += "."
-					}
-					name += k
+				if bs, err := json.Marshal(&stats); err == nil {
+					log.WithFields(fields).Infof(string(bs))
+				}
 
-					metrics.NewGauge(name, nil).Set(v, &dimMap)
+				if config.Subject != "" {
+					for k, v := range stats {
+						name := config.Prefix
+						if name != "" {
+							name += "."
+						}
+						name += k
+
+						metrics.NewGauge(name, nil).Set(v, &dimMap)
+					}
 				}
 				statLock.Unlock()
 			}()

@@ -53,7 +53,7 @@ func run(cmd *cobra.Command, args []string) {
 		}
 	}
 	stats.ReportStats(config.ReportConf, log, config.Dims)
-	tail.ProcessFile(config, args[0], log, io.SeekStart, true)
+	tail.ProcessFile(config, args[0], log, io.SeekEnd, true)
 
 	select {}
 }
@@ -75,9 +75,6 @@ func setup(cmd *cobra.Command) (*conf.Config, *logrus.Entry) {
 	if config.ReportConf != nil {
 		if config.ReportConf.Interval == 0 {
 			config.ReportConf.Interval = defaultReportSec
-		}
-		if config.ReportConf.Subject == "" {
-			log.Fatal("When reporting is enabled, a subject is required")
 		}
 	}
 
