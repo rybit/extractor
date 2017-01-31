@@ -145,11 +145,32 @@ func TestParseURLLine(t *testing.T) {
 	}
 }
 
-func TestParseLineWithTimestamp(t *testing.T) {
+func TestParseLineWithTimestampMsec(t *testing.T) {
 	fields := []FieldDef{
 		{
-			Position: 0,
-			Type:     "timestamp",
+			Position:      0,
+			Type:          "timestamp",
+			TimestampType: "msec",
+		},
+		{
+			Position: 1,
+		},
+	}
+
+	expectedTime := time.Unix(0, 1485904589183*1000000)
+	raw := "@timestamp=1485904589183 nothing=else"
+	if res, ok := ParseLine(raw, fields, tl); assert.True(t, ok) {
+		assert.Len(t, res.Dims, 1)
+		assert.Equal(t, expectedTime.UnixNano(), res.Timestamp.UnixNano())
+	}
+}
+
+func TestParseLineWithTimestampSec(t *testing.T) {
+	fields := []FieldDef{
+		{
+			Position:      0,
+			Type:          "timestamp",
+			TimestampType: "sec",
 		},
 		{
 			Position: 1,
