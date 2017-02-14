@@ -3,8 +3,6 @@ package parsing
 import (
 	"testing"
 
-	"time"
-
 	"github.com/Sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
@@ -59,11 +57,20 @@ func TestParseLineNiceLine(t *testing.T) {
 		},
 	}
 	raw := "nothing=else enter=sandman marp:123"
-	if res, ok := ParseLine(raw, fields, tl); assert.True(t, ok) {
-		assert.Len(t, res.Dims, 2)
-		assert.Nil(t, res.Timestamp)
-		assert.Equal(t, 123, res.Dims["marp"])
-		assert.Equal(t, "sandman", res.Dims["pos 1"])
+
+	if parsed, dims, ok := ParseLine(raw, fields, tl); assert.True(t, ok) {
+		assert.Len(t, dims, 0)
+		assert.Len(t, parsed, 2)
+		for _, p := range parsed {
+			switch p.Label {
+			case "pos 1":
+				validateFields(t, p, "sandman", "pos 1")
+			case "marp":
+				validateFields(t, p, 123, "marp")
+			default:
+				assert.Fail(t, "Found unexpected value")
+			}
+		}
 	}
 }
 
@@ -77,7 +84,7 @@ func TestParseLineBadDelimiterMissingRequired(t *testing.T) {
 	}
 
 	raw := "nothing:else enter=sandman marp:123"
-	_, ok := ParseLine(raw, fields, tl)
+	_, _, ok := ParseLine(raw, fields, tl)
 	assert.False(t, ok)
 }
 
@@ -91,7 +98,7 @@ func TestParseLineMissingRequiredTooShort(t *testing.T) {
 	}
 
 	raw := "nothing=else enter=sandman marp:123"
-	_, ok := ParseLine(raw, fields, tl)
+	_, _, ok := ParseLine(raw, fields, tl)
 	assert.False(t, ok)
 }
 
@@ -102,10 +109,11 @@ func TestParseLineUnknownFieldType(t *testing.T) {
 		Type:      FieldType("marp"),
 	}}
 	raw := "nothing=else enter=sandman marp:123"
-	if res, ok := ParseLine(raw, fields, tl); assert.True(t, ok) {
-		assert.Len(t, res.Dims, 1)
-		assert.Nil(t, res.Timestamp)
-		assert.Equal(t, "else", res.Dims["nothing"])
+	if parsed, dims, ok := ParseLine(raw, fields, tl); assert.True(t, ok) {
+		assert.Len(t, parsed, 1)
+		assert.EqualValues(t, "else", parsed[0].Value)
+		assert.EqualValues(t, "nothing", parsed[0].Label)
+		assert.Len(t, dims, 0)
 	}
 }
 
@@ -121,10 +129,10 @@ func TestParseLineBadDelimiter(t *testing.T) {
 		},
 	}
 	raw := "nothing=else enter=sandman marp:123"
-	if res, ok := ParseLine(raw, fields, tl); assert.True(t, ok) {
-		assert.Len(t, res.Dims, 1)
-		assert.Nil(t, res.Timestamp)
-		assert.Equal(t, "else", res.Dims["nothing"])
+	if parsed, dims, ok := ParseLine(raw, fields, tl); assert.True(t, ok) {
+		assert.Len(t, dims, 0)
+		assert.Len(t, parsed, 1)
+		validateFields(t, parsed[0], "else", "nothing")
 	}
 }
 
@@ -137,87 +145,15 @@ func TestParseURLLine(t *testing.T) {
 		},
 	}
 
-	raw := "url=https://nothing.else/matters"
-	if res, ok := ParseLine(raw, fields, tl); assert.True(t, ok) {
-		assert.Len(t, res.Dims, 1)
-		assert.Nil(t, res.Timestamp)
-		assert.Equal(t, "https://nothing.else", res.Dims["url"])
-	}
-}
+	raw := "url=https://nothing.else.com/matters"
+	if parsed, dims, ok := ParseLine(raw, fields, tl); assert.True(t, ok) {
+		assert.Len(t, parsed, 1)
+		validateFields(t, parsed[0], "nothing.else", "url")
+		assert.Len(t, dims, 2)
+		assert.EqualValues(t, "https", dims["scheme"])
+		assert.EqualValues(t, "com", dims["tld"])
 
-func TestParseLineWithTimestampMsec(t *testing.T) {
-	fields := []FieldDef{
-		{
-			Position:      0,
-			Type:          "timestamp",
-			TimestampType: "msec",
-		},
-		{
-			Position: 1,
-		},
 	}
-
-	expectedTime := time.Unix(0, 1485904589183*1000000)
-	raw := "@timestamp=1485904589183 nothing=else"
-	if res, ok := ParseLine(raw, fields, tl); assert.True(t, ok) {
-		assert.Len(t, res.Dims, 1)
-		assert.Equal(t, expectedTime.UnixNano(), res.Timestamp.UnixNano())
-	}
-}
-
-func TestParseLineWithTimestampSec(t *testing.T) {
-	fields := []FieldDef{
-		{
-			Position:      0,
-			Type:          "timestamp",
-			TimestampType: "sec",
-		},
-		{
-			Position: 1,
-		},
-	}
-
-	expectedTime := time.Unix(1483142458, 0)
-	raw := "@timestamp=1483142458 nothing=else"
-	if res, ok := ParseLine(raw, fields, tl); assert.True(t, ok) {
-		assert.Len(t, res.Dims, 1)
-		assert.Equal(t, expectedTime.UnixNano(), res.Timestamp.UnixNano())
-	}
-}
-
-func TestParseLineWithGoodValue(t *testing.T) {
-	fields := []FieldDef{
-		{
-			Position: 0,
-			Type:     "value",
-		},
-		{
-			Position: 1,
-		},
-	}
-
-	raw := "size=1483142458 nothing=else"
-	if res, ok := ParseLine(raw, fields, tl); assert.True(t, ok) {
-		assert.Len(t, res.Dims, 1)
-		assert.Nil(t, res.Timestamp)
-		assert.EqualValues(t, res.Value, 1483142458)
-	}
-}
-
-func TestParseLineWithBadValue(t *testing.T) {
-	fields := []FieldDef{
-		{
-			Position: 0,
-			Type:     "value",
-		},
-		{
-			Position: 1,
-		},
-	}
-
-	raw := "size=this-is-not-a-number nothing=else"
-	_, ok := ParseLine(raw, fields, tl)
-	assert.False(t, ok)
 }
 
 func validate(t *testing.T, def *FieldDef, req bool, pos int, label, ftype FieldType, delim string) {
@@ -226,4 +162,9 @@ func validate(t *testing.T, def *FieldDef, req bool, pos int, label, ftype Field
 	assert.EqualValues(t, ftype, def.Type, "type mismatch")
 	assert.EqualValues(t, req, def.Required, "required  mismatch")
 	assert.EqualValues(t, delim, def.Delimiter, "delimiter mismatch")
+}
+
+func validateFields(t *testing.T, p ParsedField, value interface{}, label string) {
+	assert.EqualValues(t, value, p.Value)
+	assert.Equal(t, label, p.Label)
 }

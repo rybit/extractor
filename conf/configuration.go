@@ -25,8 +25,21 @@ type Config struct {
 }
 
 type MetricDef struct {
-	Name   string             `mapstructure:"name"`
-	Fields []parsing.FieldDef `mapstructure:"fields"`
+	Name       string             `mapstructure:"name"`
+	Fields     []parsing.FieldDef `mapstructure:"fields"`
+	MungeDef   *MungeDef          `mapstructure:"munge_def"`
+	ValueField *int               `mapstructure:"value_index"`
+
+	// optional for timestamps. It supports
+	// shorthand values "msec", "nano", "sec", or a golang format
+	TimestampFormat string `mapstructure:"timestamp_format"`
+	TimestampField  *int   `mapstructure:"timestamp_index"`
+}
+
+type MungeDef struct {
+	FieldNumber   int    `mapstructure:"field_index"`
+	Joiner        string `mapstructure:"joiner"`
+	KeepDimension bool   `mapstructure:"keep_dim"`
 }
 
 // LoadConfig loads the config from a file if specified, otherwise from the environment

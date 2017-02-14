@@ -1,8 +1,4 @@
 {
-  "nats_conf": {
-    "servers": ["nats://nats.lo:4222"],
-    "log_subject": ""
-  },
   "log_conf": {
     "log_level": "debug",
     "log_file": ""
@@ -19,10 +15,13 @@
   },
   "metrics": [{
     "name": "ats.request_count",
+    "timestamp_index": 0,
+    "timestamp_format": "sec",
+    "munge_def": {
+      "field_index": 7
+    },
     "fields": [ {
-      "position": 0,
-      "label": "timestamp",
-      "type": "timestamp"
+      "position": 0
       }, {
       "position": 1,
       "label": "timing",
@@ -47,17 +46,51 @@
       }
     ]
   }, {
+    "name": "ats.request_dur",
+    "timestamp_index": 0,
+    "timestamp_format": "sec",
+    "value_index": 1,
+    "munge_def": {
+      "field_index": 7
+    },
+    "fields": [ {
+      "position": 0
+      }, {
+      "position": 1
+      }, {
+      "position": 3,
+      "label": "result"
+      }, {
+      "position": 4,
+      "label": "status",
+      "type": "number"
+      }, {
+      "position": 6,
+      "label": "method"
+      }, {
+      "position": 7,
+      "type": "url",
+      "label": "domain"
+      }, {
+      "position": 8,
+      "label": "content_type"
+      }
+    ]
+  }, {
     "name": "ats.request_size",
+    "timestamp_index": 0,
+    "timestamp_format": "sec",
+    "value_index": 5,
+    "munge_def": {
+      "field_index": 7
+    },
     "fields": [{
-      "position": 0,
-      "type": "timestamp"
+      "position": 0
     }, {
       "position": 3,
       "label": "result"
     }, {
-      "position": 5,
-      "label": "size",
-      "type": "value"
+      "position": 5
     }, {
       "position": 6,
       "label": "method"

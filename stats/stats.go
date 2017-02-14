@@ -63,13 +63,23 @@ func ReportStats(config *Config, log *logrus.Entry, dims *map[string]interface{}
 }
 
 func Increment(key string) {
-	go func() {
-		statLock.Lock()
-		defer statLock.Unlock()
-		val, ok := stats[key]
-		if !ok {
-			val = 0
-		}
-		stats[key] = val + 1
-	}()
+	statLock.Lock()
+	defer statLock.Unlock()
+	val, ok := stats[key]
+	if !ok {
+		val = 0
+	}
+	stats[key] = val + 1
+}
+
+func Get(key string) int64 {
+	statLock.Lock()
+	defer statLock.Unlock()
+	return stats[key]
+}
+
+func Reset() {
+	statLock.Lock()
+	stats = make(map[string]int64)
+	statLock.Unlock()
 }
