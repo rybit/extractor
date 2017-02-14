@@ -52,12 +52,11 @@ func TestReadLines(t *testing.T) {
 
 	select {
 	case rm := <-sent:
-		assert.Equal(t, "testing-1-gotham", rm.Name)
+		assert.Equal(t, "testing-1-gotham.com", rm.Name)
 		assert.Equal(t, metrics.CounterType, rm.Type)
 		assert.EqualValues(t, 123, rm.Value)
-		assert.Equal(t, 4, len(rm.Dims))
+		assert.Equal(t, 3, len(rm.Dims))
 		assert.Equal(t, true, rm.Dims["some-bool"])
-		assert.Equal(t, "com", rm.Dims["tld"])
 		assert.Equal(t, "https", rm.Dims["scheme"])
 		assert.Equal(t, "batman-rules", rm.Dims["some-string"])
 		shutdown <- true

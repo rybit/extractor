@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"golang.org/x/net/publicsuffix"
 )
 
 type FieldType string
@@ -131,10 +130,9 @@ func ParseLine(raw string, fields []FieldDef, log *logrus.Entry) (map[int]Parsed
 		case StringType, FieldType(""):
 			val = rawVal
 		case URLType:
-			var scheme, url, tld string
-			scheme, url, tld, err = extractDomain(rawVal)
+			var scheme, url string
+			scheme, url, err = extractDomain(rawVal)
 			extra["scheme"] = scheme
-			extra["tld"] = tld
 			val = url
 		default:
 			val = rawVal
@@ -161,13 +159,11 @@ func ParseLine(raw string, fields []FieldDef, log *logrus.Entry) (map[int]Parsed
 	return parsed, extra, true
 }
 
-func extractDomain(rawURL string) (string, string, string, error) {
+func extractDomain(rawURL string) (string, string, error) {
 	url, err := url.Parse(rawURL)
 	if err != nil {
-		return "", "", "", err
+		return "", "", err
 	}
 
-	tld, _ := publicsuffix.PublicSuffix(url.Host)
-	host := url.Host[:len(url.Host)-len(tld)-1]
-	return url.Scheme, host, tld, nil
+	return url.Scheme, url.Host, nil
 }

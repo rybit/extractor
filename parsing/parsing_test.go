@@ -148,10 +148,9 @@ func TestParseURLLine(t *testing.T) {
 	raw := "url=https://nothing.else.com/matters"
 	if parsed, dims, ok := ParseLine(raw, fields, tl); assert.True(t, ok) {
 		assert.Len(t, parsed, 1)
-		validateFields(t, parsed[0], "nothing.else", "url")
-		assert.Len(t, dims, 2)
+		validateFields(t, parsed[0], "nothing.else.com", "url")
+		assert.Len(t, dims, 1)
 		assert.EqualValues(t, "https", dims["scheme"])
-		assert.EqualValues(t, "com", dims["tld"])
 
 	}
 }
